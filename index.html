@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<title>THE FACTORY — BREACH PROTOCOL</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap');
+
+  :root{
+    --bg:#050805;
+    --green:#3fd93f;
+    --green-dim:#1c5c1c;
+    --green-glow: rgba(63,217,63,0.55);
+    --amber:#ffb000;
+    --blood:#a3231f;
+    --blood-glow: rgba(163,35,31,0.65);
+    --blue:#7fd1ff;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%; background:var(--bg); font-family:'Share Tech Mono', monospace; color:var(--green); overflow:hidden;}
+
+  #crt{ position:fixed; inset:0; background:radial-gradient(ellipse at center, rgba(20,40,20,0.25) 0%, rgba(0,0,0,0.85) 100%); display:flex; align-items:center; justify-content:center; }
+  #screen{ position:relative; width:min(1040px, 96vw); height:min(700px, 94vh); background:#030603; border:2px solid #123312; border-radius:14px;
+    box-shadow: 0 0 0 6px #060906, 0 0 40px rgba(0,0,0,0.9), inset 0 0 80px rgba(63,217,63,0.06); overflow:hidden; }
+  #screen::before{ content:""; position:absolute; inset:0; background:repeating-linear-gradient(to bottom, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px, transparent 2px, transparent 3px); pointer-events:none; z-index:50; mix-blend-mode:multiply; }
+  #screen::after{ content:""; position:absolute; inset:0; box-shadow: inset 0 0 120px 30px rgba(0,0,0,0.85); pointer-events:none; z-index:51; animation:flicker 6s infinite; }
+  @keyframes flicker{ 0%,96%,100%{opacity:1;} 97%{opacity:0.85;} 98%{opacity:1;} 99%{opacity:0.9;} }
+
+  .pane{ position:absolute; inset:0; padding:24px 28px; display:none; flex-direction:column; text-shadow:0 0 6px var(--green-glow); }
+  .pane.active{ display:flex; }
+
+  .topbar{ display:flex; justify-content:space-between; align-items:center; font-family:'VT323', monospace; font-size:19px; letter-spacing:2px; color:var(--green-dim); border-bottom:1px solid var(--green-dim); padding-bottom:8px; margin-bottom:12px; flex-shrink:0; }
+  .topbar .live{ color:var(--amber); }
+
+  #intro{ align-items:flex-start; justify-content:center; }
+  #introLog{ font-size:15px; line-height:1.6; }
+  .bootline{ opacity:0; animation:appear .05s forwards; }
+  .bootline .ok{ color:var(--green); } .bootline .warn{ color:var(--amber); } .bootline .err{ color:var(--blood); }
+  @keyframes appear{ to{opacity:1;} }
+
+  /* HACK generic */
+  #hack .hheader{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px; flex-shrink:0; gap:16px; }
+  #hack .htitle{ font-family:'VT323', monospace; font-size:20px; letter-spacing:2px; color:var(--blood); text-shadow:0 0 8px var(--blood-glow); }
+  #hack .hheader-right{ display:flex; align-items:center; gap:16px; }
+  #hack .attempts{ display:flex; gap:6px; align-items:center; font-size:12px; color:var(--green-dim); }
+  #hack .pip{ width:13px; height:13px; border:1px solid var(--green); }
+  #hack .pip.used{ background:var(--blood); border-color:var(--blood); box-shadow:0 0 6px var(--blood-glow); }
+  #hack .modtag{ font-family:'VT323',monospace; font-size:16px; color:var(--green-dim); letter-spacing:1px; }
+  #hackArea{ flex:1; min-height:0; display:flex; gap:20px; }
+  #hackFooter{ margin-top:10px; font-size:11px; color:var(--green-dim); flex-shrink:0; }
+
+  .feedcol{ width:260px; flex-shrink:0; border:1px solid var(--green-dim); padding:10px 14px; display:flex; flex-direction:column; font-size:11.5px; background:rgba(0,0,0,0.3); }
+  .feedcol .feedtitle{ color:var(--green-dim); margin-bottom:8px; letter-spacing:1px; }
+  #feedlog{ flex:1; overflow-y:auto; display:flex; flex-direction:column-reverse; gap:4px; }
+  #feedlog div{ opacity:0; animation:appear .1s forwards; }
+  #feedlog .sys{ color:var(--green-dim); } #feedlog .like{ color:var(--amber); } #feedlog .bad{ color:var(--blood); } #feedlog .good{ color:var(--green); font-weight:bold; }
+
+  /* MASTERMIND */
+  .mmwrap{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; }
+  .mmdials{ display:flex; gap:14px; }
+  .mmdial{ display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .mmdial .digit{ font-family:'VT323',monospace; font-size:40px; width:52px; text-align:center; border:2px solid var(--green-dim); padding:4px 0; }
+  .mmdial button{ width:40px; height:26px; background:transparent; border:1px solid var(--green); color:var(--green); cursor:pointer; font-family:monospace; font-size:14px; }
+  .mmdial button:hover{ background:rgba(63,217,63,0.15); }
+  .mmbtn{ background:transparent; border:1px solid var(--amber); color:var(--amber); padding:10px 26px; letter-spacing:2px; cursor:pointer; font-family:'Share Tech Mono',monospace; }
+  .mmbtn:hover{ background:rgba(255,176,0,0.12); }
+  .mmhistory{ width:100%; max-width:420px; max-height:170px; overflow-y:auto; font-size:12px; border:1px solid var(--green-dim); padding:8px 12px; }
+  .mmrow{ display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px dashed rgba(28,92,28,0.4); }
+  .mmpegs span{ display:inline-block; width:9px; height:9px; border-radius:50%; margin-left:2px; }
+  .peg-black{ background:var(--green); box-shadow:0 0 5px var(--green-glow); }
+  .peg-white{ background:var(--amber); }
+  .peg-empty{ background:transparent; border:1px solid var(--green-dim); }
+
+  /* LOCKPICK */
+  .lockwrap{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px; }
+  .lockpins{ display:flex; gap:10px; }
+  .lockpin{ width:34px; height:14px; border:1px solid var(--green-dim); }
+  .lockpin.done{ background:var(--green); border-color:var(--green); box-shadow:0 0 8px var(--green-glow); }
+  .lockpin.active{ border-color:var(--amber); }
+  .locktrack{ position:relative; width:420px; height:34px; border:1px solid var(--green-dim); background:rgba(63,217,63,0.03); }
+  .lockzone{ position:absolute; top:0; bottom:0; background:rgba(63,217,63,0.28); border-left:1px solid var(--green); border-right:1px solid var(--green); }
+  .lockneedle{ position:absolute; top:-6px; width:3px; height:46px; background:var(--blood); box-shadow:0 0 8px var(--blood-glow); }
+  .lockbtn{ background:transparent; border:1px solid var(--blood); color:var(--blood); padding:12px 30px; letter-spacing:3px; cursor:pointer; font-family:'Share Tech Mono',monospace; font-size:14px; }
+  .lockbtn:hover{ background:rgba(163,35,31,0.14); }
+  .lockstatus{ font-family:'VT323',monospace; font-size:18px; color:var(--amber); letter-spacing:1px; }
+
+  /* MIRROR SEQUENCE */
+  .mirrorwrap{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; }
+  .mirrorgrid{ display:grid; grid-template-columns:repeat(4,84px); grid-template-rows:repeat(2,84px); gap:10px; }
+  .mirrortile{ border:2px solid var(--green-dim); display:flex; align-items:center; justify-content:center; font-family:'VT323',monospace; font-size:22px; color:var(--green-dim); cursor:pointer; user-select:none; transition:.06s; }
+  .mirrortile.lit{ background:var(--green); color:#000; box-shadow:0 0 30px var(--green-glow); border-color:var(--green); }
+  .mirrortile.wrong{ background:var(--blood); border-color:var(--blood); }
+  .mirrorstatus{ font-family:'VT323',monospace; font-size:19px; letter-spacing:2px; color:var(--amber); }
+  .mirrorround{ font-size:12px; color:var(--green-dim); }
+  .mirrortimerbar{ width:340px; height:8px; border:1px solid var(--green-dim); overflow:hidden; }
+  .mirrortimerfill{ height:100%; background:var(--blood); width:100%; }
+
+  /* SIMON SAYS */
+  .simonwrap{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; }
+  .simongrid{ display:grid; grid-template-columns:repeat(2,120px); grid-template-rows:repeat(2,120px); gap:12px; }
+  .simonbtn{ border:3px solid var(--green-dim); cursor:pointer; transition:.08s; }
+  .simonbtn.flash{ filter:brightness(1.8); box-shadow:0 0 40px var(--green-glow); }
+  .simonbtn.sb0{ background:#1a4d1a; } .simonbtn.sb1{ background:#4d1a1a; } .simonbtn.sb2{ background:#1a1a4d; } .simonbtn.sb3{ background:#4d4d1a; }
+  .simonstatus{ font-family:'VT323',monospace; font-size:19px; color:var(--amber); letter-spacing:2px; }
+
+  /* WIRE DEFUSE */
+  .wirewrap{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; }
+  .wirelist{ display:flex; flex-direction:column; gap:10px; }
+  .wireitem{ display:flex; align-items:center; gap:12px; padding:8px 16px; border:1px solid var(--green-dim); background:rgba(0,0,0,0.25); cursor:pointer; transition:.1s; }
+  .wireitem:hover{ background:rgba(63,217,63,0.08); }
+  .wireitem.cut{ opacity:0.4; text-decoration:line-through; pointer-events:none; }
+  .wirebox{ width:16px; height:16px; border:2px solid; }
+  .wirebox.wc-red{ border-color:#a3231f; background:#a3231f; box-shadow:0 0 8px var(--blood-glow); }
+  .wirebox.wc-blue{ border-color:#7fd1ff; background:#7fd1ff; box-shadow:0 0 8px rgba(127,209,255,0.5); }
+  .wirebox.wc-green{ border-color:var(--green); background:var(--green); box-shadow:0 0 8px var(--green-glow); }
+  .wirebox.wc-yellow{ border-color:#ffb000; background:#ffb000; box-shadow:0 0 8px rgba(255,176,0,0.5); }
+  .wirebox.wc-white{ border-color:#ccc; background:#ccc; }
+  .wirelabel{ font-family:'Share Tech Mono',monospace; font-size:13px; color:var(--green-dim); }
+  .wirestatus{ font-family:'VT323',monospace; font-size:19px; color:var(--amber); letter-spacing:2px; }
+  .wirerule{ font-size:11px; color:var(--green-dim); max-width:380px; padding:8px 12px; border:1px dashed var(--green-dim); }
+
+  /* MEMORY PAIRS */
+  .memorywrap{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; }
+  .memorygrid{ display:grid; grid-template-columns:repeat(4,70px); grid-template-rows:repeat(4,70px); gap:8px; }
+  .memorycard{ border:2px solid var(--green-dim); display:flex; align-items:center; justify-content:center; font-family:'VT323',monospace; font-size:26px; color:var(--green); cursor:pointer; user-select:none; transition:.15s; background:rgba(0,0,0,0.4); }
+  .memorycard.flipped{ background:var(--green); color:#000; box-shadow:0 0 20px var(--green-glow); border-color:var(--green); }
+  .memorycard.matched{ background:var(--green-dim); color:#000; pointer-events:none; opacity:0.6; }
+  .memorystatus{ font-family:'VT323',monospace; font-size:19px; color:var(--amber); letter-spacing:2px; }
+
+  /* transitions / locked / final */
+  #transition, #lockedScreen, #finalReveal{ align-items:center; justify-content:center; text-align:center; gap:14px; }
+  #transition .big{ font-family:'VT323', monospace; font-size:38px; letter-spacing:4px; color:var(--green); text-shadow:0 0 20px var(--green-glow); animation:pulseGreen 1s infinite; }
+  #transition .skipcode{ margin-top:8px; padding:12px 20px; border:1px solid var(--amber); background:rgba(255,176,0,0.05); font-family:'VT323',monospace; font-size:16px; color:var(--amber); letter-spacing:2px; }
+  #lockedScreen .big{ font-family:'VT323', monospace; font-size:42px; letter-spacing:4px; color:var(--blood); text-shadow:0 0 20px var(--blood-glow); animation:pulseRed 1s infinite; }
+  #finalReveal .big{ font-family:'VT323', monospace; font-size:40px; letter-spacing:4px; color:var(--blue); text-shadow:0 0 20px rgba(127,209,255,0.6); }
+  @keyframes pulseRed{ 50%{opacity:0.5;} } @keyframes pulseGreen{ 50%{opacity:0.6;} }
+  button.term-btn{ margin-top:10px; background:transparent; border:1px solid var(--green); color:var(--green); font-family:'Share Tech Mono', monospace; padding:10px 22px; letter-spacing:2px; cursor:pointer; font-size:13px; }
+  button.term-btn:hover{ background:rgba(63,217,63,0.12); }
+  button.drive-btn{ margin-top:14px; background:transparent; border:2px solid var(--blue); color:var(--blue); font-family:'Share Tech Mono', monospace; padding:12px 28px; letter-spacing:2px; cursor:pointer; font-size:15px; text-shadow:0 0 8px rgba(127,209,255,0.4); }
+  button.drive-btn:hover{ background:rgba(127,209,255,0.12); box-shadow:0 0 15px rgba(127,209,255,0.3); }
+  #lockedScreen button.term-btn{ border-color:var(--blood); color:var(--blood); }
+  #lockedScreen button.term-btn:hover{ background:rgba(163,35,31,0.12); }
+  #finalReveal .ictext{ font-size:15px; color:var(--blue); font-weight:bold; margin-bottom:8px; letter-spacing:1px; }
+
+  ::selection{ background:var(--green); color:#000; }
+</style>
+</head>
+<body>
+<div id="crt"><div id="screen">
+
+  <!-- INTRO (krótkie) -->
+  <div class="pane active" id="intro">
+    <div class="topbar" style="width:100%;"><span>UNAUTHORIZED UPLINK // THE FACTORY NET</span><span class="live">● ŁĄCZENIE...</span></div>
+    <div id="introLog"></div>
+  </div>
+
+  <!-- HACK (reużywany dla 3 modułów) -->
+  <div class="pane" id="hack">
+    <div class="hheader">
+      <div style="display:flex; align-items:baseline; gap:12px;">
+        <div class="htitle" id="hackTitle">◤ MODUŁ ◢</div>
+        <div class="modtag" id="modTag">MODUŁ 1/3</div>
+      </div>
+      <div class="hheader-right">
+        <div class="attempts" id="attemptsWrap">PRÓBY:</div>
+      </div>
+    </div>
+    <div id="hackArea"></div>
+    <div id="hackFooter"></div>
+  </div>
+
+  <!-- TRANSITION -->
+  <div class="pane" id="transition">
+    <div class="big" id="transBig">MODUŁ ZŁAMANY</div>
+    <div style="font-size:13px; color:var(--green-dim);" id="transSub">ładowanie kolejnego modułu...</div>
+    <div class="skipcode" id="transSkipCode"></div>
+  </div>
+
+  <!-- LOCKED -->
+  <div class="pane" id="lockedScreen">
+    <div class="big">TERMINAL ZABLOKOWANY</div>
+    <div style="color:var(--blood); font-size:14px; max-width:480px;">Przekroczono liczbę dozwolonych prób. System ochrony fabryki wykrył włamanie i odciął zdalne połączenie.</div>
+    <button class="term-btn" onclick="location.reload()">↻ ZRESTARTUJ WŁAMANIE</button>
+  </div>
+
+  <!-- FINAL -->
+  <div class="pane" id="finalReveal">
+    <div class="big">DOSTĘP DO NAGRANIA</div>
+    <div class="ictext">IC: [Widzisz aktywujące się nagranie]</div>
+    <button class="drive-btn" id="driveBtn" onclick="window.open('https://drive.google.com/file/d/1zNGopONMGvt-g4H2BQ5ny5WicsntL8kB/view?usp=sharing', '_blank')">◤ ODTWÓRZ NAGRANIE ◢</button>
+  </div>
+
+</div></div>
+
+<script>
+function switchPane(from, to){
+  document.getElementById(from).classList.remove('active');
+  document.getElementById(to).classList.add('active');
+}
+function rand(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+function shuffle(arr){ const a=arr.slice(); for(let i=a.length-1;i>0;i--){ const j=rand(0,i); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+/* ============================================================
+   INTRO — bardzo krótki, od razu przechodzi do hacka 1
+============================================================ */
+const introLines = [
+  ["OK","OMIJANIE ZAPORY THE FACTORY..."],
+  ["WARN","6 MODUŁÓW ZABEZPIECZAJĄCYCH AKTYWNE"],
+  ["ERR","BRAK CZASU NA PEŁNĄ INICJALIZACJĘ — START NATYCHMIASTOWY"]
+];
+const introLog = document.getElementById('introLog');
+let ii=0;
+function typeIntro(){
+  if(ii>=introLines.length){ setTimeout(()=>{ switchPane('intro','hack'); startModule(1); }, 350); return; }
+  const [status,text]=introLines[ii];
+  const div=document.createElement('div'); div.className='bootline';
+  const cls = status==='OK'?'ok':(status==='WARN'?'warn':'err');
+  const label = status==='OK'?'[  OK  ]':(status==='WARN'?'[ WARN ]':'[ !!!! ]');
+  div.innerHTML = '<span class="'+cls+'">'+label+'</span>  '+text;
+  introLog.appendChild(div); ii++;
+  setTimeout(typeIntro, 220);
+}
+setTimeout(typeIntro, 200);
+
+/* ============================================================
+   FRAMEWORK: próby / feed log / przejście między modułami
+============================================================ */
+let attemptsLeft=0, attemptsMax=0, currentModule=0;
+const TOTAL_MODULES = 6;
+const collectedKeys = [];
+// Kody skip są zakodowane - nie podglądaj! :)
+const SKIP_CODES = atob('QUxQSEE3WA==,QlJBVk8ySw==,Q0hBUkxJRTlaWg==,REVMVEE0TQ==,RUNITT1Q,Rk9YVFJPVDBRQ==').split(',').map(c=>atob(c));
+const MASTER_CODE = atob('amVzdGVyNjc=');
+let lockScreenTimeout = null;
+let moduleCompleted = false;
+
+function setupAttempts(n){
+  attemptsMax=n; attemptsLeft=n;
+  moduleCompleted = false;
+  if(lockScreenTimeout){ clearTimeout(lockScreenTimeout); lockScreenTimeout = null; }
+  const wrap=document.getElementById('attemptsWrap');
+  wrap.innerHTML='PRÓBY: ';
+  for(let i=0;i<n;i++){ const p=document.createElement('div'); p.className='pip'; p.id='pip'+i; wrap.appendChild(p); }
+}
+function updatePips(){
+  for(let i=0;i<attemptsMax;i++){
+    const p=document.getElementById('pip'+i);
+    if(p) p.className='pip'+(i<(attemptsMax-attemptsLeft)?' used':'');
+  }
+}
+function loseAttempt(){
+  if(moduleCompleted) return false; // nie trać próby jeśli moduł już ukończony
+  attemptsLeft--; updatePips();
+  if(attemptsLeft<=0){ 
+    lockScreenTimeout = setTimeout(()=> {
+      if(!moduleCompleted) switchPane('hack','lockedScreen');
+    }, 700); 
+    return true; 
+  }
+  return false;
+}
+let feedEl;
+function feedPush(html, cls){
+  const d=document.createElement('div'); d.className=cls||'sys'; d.innerHTML=html; feedEl.prepend(d);
+}
+function makeFeedCol(){
+  const col=document.createElement('div'); col.className='feedcol';
+  col.innerHTML='<div class="feedtitle">&gt; DZIENNIK WŁAMANIA</div><div id="feedlog"></div>';
+  return col;
+}
+
+/* ============================================================
+   SKIP CODE — wpisanie specjalnego kodu dla bieżącego hacka pomija go
+============================================================ */
+(function(){
+  let buf = '';
+  document.addEventListener('keydown', function(e){
+    if(e.target && (e.target.tagName==='INPUT' || e.target.tagName==='TEXTAREA')) return;
+    const k = (e.key||'').toLowerCase();
+    if(k.length===1 && /[a-z0-9]/.test(k)){
+      buf += k;
+      if(buf.length>15) buf = buf.slice(buf.length-15);
+      const hackPane = document.getElementById('hack');
+      if(hackPane.classList.contains('active') && currentModule>=1 && currentModule<=TOTAL_MODULES){
+        // Master skip code - zakodowany
+        if(buf.endsWith(MASTER_CODE)){
+          buf='';
+          if(typeof feedEl!=='undefined' && feedEl) feedPush('&gt; MASTER CODE — MODUŁ WYMUSZONY', 'good');
+          onModuleWin('JESTER-'+currentModule);
+          return;
+        }
+        // Indywidualne kody dla każdego modułu - zakodowane
+        const code = SKIP_CODES[currentModule-1].toLowerCase();
+        if(buf.endsWith(code)){
+          buf='';
+          if(typeof feedEl!=='undefined' && feedEl) feedPush('&gt; KOD POMINIĘCIA WYKRYTY — MODUŁ WYMUSZONY', 'good');
+          onModuleWin('SKIP-'+SKIP_CODES[currentModule-1]);
+        }
+      }
+    }
+  });
+})();
+
+function startModule(n){
+  currentModule = n;
+  document.getElementById('modTag').textContent = 'MODUŁ '+n+'/'+TOTAL_MODULES;
+  const area=document.getElementById('hackArea'); area.innerHTML='';
+  const footer=document.getElementById('hackFooter'); footer.innerHTML='';
+  if(n===1) startMastermind(area, footer);
+  else if(n===2) startLockpick(area, footer);
+  else if(n===3) startMirrorSequence(area, footer);
+  else if(n===4) startSimonSays(area, footer);
+  else if(n===5) startWireDefuse(area, footer);
+  else if(n===6) startMemoryPairs(area, footer);
+}
+
+function onModuleWin(key){
+  moduleCompleted = true; // ustaw flagę że moduł ukończony
+  if(lockScreenTimeout){ clearTimeout(lockScreenTimeout); lockScreenTimeout = null; } // anuluj timeout lockScreen
+  collectedKeys.push(key);
+  const n = currentModule;
+  const skipCodeEl = document.getElementById('transSkipCode');
+  if(n < TOTAL_MODULES){
+    document.getElementById('transBig').textContent = 'MODUŁ '+n+'/'+TOTAL_MODULES+' ZŁAMANY';
+    document.getElementById('transSub').textContent = 'ładowanie modułu '+(n+1)+'/'+TOTAL_MODULES+'...';
+    skipCodeEl.textContent = 'KOD SKIP DLA MODUŁU '+n+': '+SKIP_CODES[n-1];
+    switchPane('hack','transition');
+    setTimeout(()=>{ switchPane('transition','hack'); startModule(n+1); }, 5000);
+  } else {
+    document.getElementById('transBig').textContent = 'OSTATNI MODUŁ ZŁAMANY';
+    document.getElementById('transSub').textContent = 'aktywacja nagrania IC...';
+    skipCodeEl.textContent = 'KOD SKIP DLA MODUŁU '+n+': '+SKIP_CODES[n-1];
+    switchPane('hack','transition');
+    setTimeout(()=>{
+      switchPane('transition','finalReveal');
+    }, 5000);
+  }
+}
+
+/* ============================================================
+   MODUŁ 1 — MASTERMIND (dedukcja logiczna)
+   5 cyfr (0-9, z powtórzeniami), 8 prób, feedback czarny/biały
+============================================================ */
+function startMastermind(area, footer){
+  setupAttempts(8);
+  document.getElementById('hackTitle').textContent = '◤ RDZEŃ AUTORYZACJI — KOD DOSTĘPU ◢';
+  footer.textContent = 'Odgadnij 3-cyfrowy kod (cyfry 0-9, mogą się powtarzać). Po każdej próbie: ● = poprawna cyfra na właściwym miejscu, ○ = poprawna cyfra, złe miejsce. Masz 8 prób.';
+
+  const LEN = 3;
+  const secret = Array.from({length:LEN}, ()=> rand(0,9));
+
+  const wrap = document.createElement('div'); wrap.className='mmwrap';
+  const dials = document.createElement('div'); dials.className='mmdials';
+  let values = new Array(LEN).fill(0);
+  const digitEls=[];
+  for(let i=0;i<LEN;i++){
+    const d=document.createElement('div'); d.className='mmdial';
+    const up=document.createElement('button'); up.textContent='▲';
+    const dg=document.createElement('div'); dg.className='digit'; dg.textContent='0';
+    const down=document.createElement('button'); down.textContent='▼';
+    up.addEventListener('click', ()=>{ values[i]=(values[i]+1)%10; dg.textContent=values[i]; });
+    down.addEventListener('click', ()=>{ values[i]=(values[i]+9)%10; dg.textContent=values[i]; });
+    d.appendChild(up); d.appendChild(dg); d.appendChild(down);
+    dials.appendChild(d); digitEls.push(dg);
+  }
+  const btn = document.createElement('button'); btn.className='mmbtn'; btn.textContent='◤ SPRAWDŹ KOD ◢';
+  const history = document.createElement('div'); history.className='mmhistory';
+
+  wrap.appendChild(dials); wrap.appendChild(btn); wrap.appendChild(history);
+  const feedCol = makeFeedCol();
+  area.appendChild(wrap); area.appendChild(feedCol);
+  feedEl = feedCol.querySelector('#feedlog');
+  feedPush('&gt; MODUŁ AUTORYZACJI AKTYWNY', 'sys');
+  feedPush('&gt; 3 CYFRY, ZAKRES 0-9, 8 PRÓB', 'bad');
+
+  btn.addEventListener('click', ()=>{
+    const guess = values.slice();
+    let black=0;
+    const secretLeft=[], guessLeft=[];
+    for(let i=0;i<LEN;i++){
+      if(guess[i]===secret[i]) black++;
+      else { secretLeft.push(secret[i]); guessLeft.push(guess[i]); }
+    }
+    let white=0;
+    const pool = secretLeft.slice();
+    guessLeft.forEach(g=>{
+      const idx = pool.indexOf(g);
+      if(idx!==-1){ white++; pool.splice(idx,1); }
+    });
+
+    const row = document.createElement('div'); row.className='mmrow';
+    let pegsHtml = '<span class="mmpegs">';
+    for(let i=0;i<black;i++) pegsHtml += '<span class="peg-black"></span>';
+    for(let i=0;i<white;i++) pegsHtml += '<span class="peg-white"></span>';
+    for(let i=black+white;i<LEN;i++) pegsHtml += '<span class="peg-empty"></span>';
+    pegsHtml += '</span>';
+    row.innerHTML = '<span>'+guess.join('')+'</span>'+pegsHtml;
+    history.prepend(row);
+
+    feedPush('&gt; PRÓBA: '+guess.join('')+' — ● '+black+' / ○ '+white, black>0?'like':'sys');
+
+    if(black===LEN){
+      feedPush('&gt; KOD POPRAWNY — AUTORYZACJA PRZEŁAMANA', 'good');
+      btn.disabled = true;
+      setTimeout(()=> onModuleWin(secret.join('')), 700);
+    } else {
+      loseAttempt();
+    }
+  });
+}
+
+/* ============================================================
+   MODUŁ 2 — LOCKPICK (precyzyjny timing) - SPOWOLNIONY
+   5 pinów, poruszająca się igła, wąska strefa, 3 błędy na cały moduł
+============================================================ */
+function startLockpick(area, footer){
+  setupAttempts(3);
+  document.getElementById('hackTitle').textContent = '◤ MECHANIZM RYGLA — SEKWENCJA PINÓW ◢';
+  footer.textContent = 'Zatrzymaj igłę dokładnie w zielonej strefie (klawisz SPACJA lub przycisk). 5 pinów, strefa zwęża się i przyspiesza z każdym pinem.';
+
+  const wrap = document.createElement('div'); wrap.className='lockwrap';
+  const pinsRow = document.createElement('div'); pinsRow.className='lockpins';
+  const pinEls = [];
+  for(let i=0;i<5;i++){ const p=document.createElement('div'); p.className='lockpin'; pinsRow.appendChild(p); pinEls.push(p); }
+  const status = document.createElement('div'); status.className='lockstatus'; status.textContent='PIN 1 / 5';
+  const track = document.createElement('div'); track.className='locktrack';
+  const zone = document.createElement('div'); zone.className='lockzone';
+  const needle = document.createElement('div'); needle.className='lockneedle';
+  track.appendChild(zone); track.appendChild(needle);
+  const btn = document.createElement('button'); btn.className='lockbtn'; btn.textContent='◤ ZATRZYMAJ ◢';
+
+  wrap.appendChild(status); wrap.appendChild(pinsRow); wrap.appendChild(track); wrap.appendChild(btn);
+  const feedCol = makeFeedCol();
+  area.appendChild(wrap); area.appendChild(feedCol);
+  feedEl = feedCol.querySelector('#feedlog');
+  feedPush('&gt; MECHANIZM RYGLA ZAŁADOWANY', 'sys');
+  feedPush('&gt; TYLKO 3 BŁĘDY DOZWOLONE NA CAŁY MODUŁ', 'bad');
+
+  let pinIndex = 0;
+  const TRACK_W = 420;
+  let running = true;
+  let startTime = performance.now();
+  let period, zoneStartPct, zoneWidthPct;
+
+  function configurePin(i){
+    pinEls.forEach((p,idx)=> p.classList.toggle('active', idx===i));
+    status.textContent = 'PIN '+(i+1)+' / 5';
+    // SPOWOLNIONY: dłuższe okresy, szersze strefy
+    period = Math.max(1200, 2400 - i*220);
+    zoneWidthPct = Math.max(12, 28 - i*3);
+    zoneStartPct = rand(0, 100-zoneWidthPct);
+    zone.style.left = (zoneStartPct/100*TRACK_W)+'px';
+    zone.style.width = (zoneWidthPct/100*TRACK_W)+'px';
+    startTime = performance.now();
+  }
+  function posPct(now){
+    const t = now - startTime;
+    return 50 + 50*Math.sin(2*Math.PI*t/period);
+  }
+  function frame(now){
+    if(!running) return;
+    const pct = posPct(now);
+    needle.style.left = (pct/100*TRACK_W - 1.5)+'px';
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  configurePin(pinIndex);
+
+  function attempt(){
+    if(!running) return;
+    const pct = posPct(performance.now());
+    if(pct>=zoneStartPct && pct<=zoneStartPct+zoneWidthPct){
+      pinEls[pinIndex].classList.add('done');
+      feedPush('&gt; PIN '+(pinIndex+1)+' TRAFIONY', 'like');
+      pinIndex++;
+      if(pinIndex>=5){
+        running=false;
+        feedPush('&gt; WSZYSTKIE PINY USTAWIONE — RYGIEL OTWARTY', 'good');
+        setTimeout(()=> onModuleWin('PIN-OK'), 700);
+      } else {
+        configurePin(pinIndex);
+      }
+    } else {
+      feedPush('&gt; PUDŁO — IGŁA POZA STREFĄ', 'bad');
+      const fail = loseAttempt();
+      if(fail){ running=false; }
+      else { configurePin(pinIndex); }
+    }
+  }
+  btn.addEventListener('click', attempt);
+  function keyHandler(e){ if(e.code==='Space'){ e.preventDefault(); attempt(); } }
+  document.addEventListener('keydown', keyHandler);
+}
+
+/* ============================================================
+   MODUŁ 3 — MIRROR SEQUENCE (pamięć odwrócona + presja czasu)
+   8 kafli, sekwencja do 10, klik w ODWROTNEJ kolejności, kurczący się czas na klik
+============================================================ */
+function startMirrorSequence(area, footer){
+  setupAttempts(3);
+  document.getElementById('hackTitle').textContent = '◤ RDZEŃ PAMIĘCI — SEKWENCJA LUSTRZANA ◢';
+  footer.textContent = 'Zapamiętaj sekwencję, a następnie odtwórz ją W ODWROTNEJ KOLEJNOŚCI. Masz ograniczony czas na każde kliknięcie — pasek na dole to Twój zegar.';
+
+  const wrap = document.createElement('div'); wrap.className='mirrorwrap';
+  wrap.innerHTML = `
+    <div class="mirrorstatus" id="mirStatus">PRZYGOTOWANIE...</div>
+    <div class="mirrorgrid" id="mirGrid">
+      <div class="mirrortile" data-c="0"></div><div class="mirrortile" data-c="1"></div><div class="mirrortile" data-c="2"></div><div class="mirrortile" data-c="3"></div>
+      <div class="mirrortile" data-c="4"></div><div class="mirrortile" data-c="5"></div><div class="mirrortile" data-c="6"></div><div class="mirrortile" data-c="7"></div>
+    </div>
+    <div class="mirrorround" id="mirRound">RUNDA: 0 / 10</div>
+    <div class="mirrortimerbar"><div class="mirrortimerfill" id="mirTimerFill"></div></div>
+  `;
+  const feedCol = makeFeedCol();
+  area.appendChild(wrap); area.appendChild(feedCol);
+  feedEl = feedCol.querySelector('#feedlog');
+  feedPush('&gt; RDZEŃ PAMIĘCI ZSYNCHRONIZOWANY', 'sys');
+  feedPush('&gt; ODTWARZAJ SEKWENCJĘ OD KOŃCA (LUSTRO)', 'bad');
+
+  const tiles = wrap.querySelectorAll('.mirrortile');
+  const NTILES = tiles.length;
+  const TARGET = 10;
+  const timerFill = wrap.querySelector('#mirTimerFill');
+  let sequence=[], mirrored=[], playerPos=0, round=0, accepting=false;
+  let clickTimer=null;
+
+  function updateRound(){ wrap.querySelector('#mirRound').textContent='RUNDA: '+round+' / '+TARGET; }
+  function speedFor(r){ return Math.max(160, 320 - r*12); }
+  function clickWindowFor(r){ return Math.max(650, 1500 - r*70); }
+
+  function clearClickTimer(){ if(clickTimer){ clearTimeout(clickTimer); clickTimer=null; } timerFill.style.transition='none'; timerFill.style.width='100%'; }
+
+  async function playSequence(){
+    accepting=false; clearClickTimer();
+    wrap.querySelector('#mirStatus').textContent='OBSERWUJ SEKWENCJĘ...';
+    const spd=speedFor(round);
+    for(const idx of sequence){ await lightTile(idx, spd); }
+    mirrored = sequence.slice().reverse();
+    wrap.querySelector('#mirStatus').textContent='ODTWÓRZ OD KOŃCA';
+    playerPos=0; accepting=true;
+    armClickTimer();
+  }
+  function lightTile(idx, spd){
+    return new Promise(res=>{
+      tiles[idx].classList.add('lit');
+      setTimeout(()=>{ tiles[idx].classList.remove('lit'); setTimeout(res, Math.max(70,spd*0.35)); }, spd);
+    });
+  }
+  function armClickTimer(){
+    clearClickTimer();
+    const w = clickWindowFor(round);
+    requestAnimationFrame(()=>{
+      timerFill.style.transition = 'width '+w+'ms linear';
+      timerFill.style.width = '0%';
+    });
+    clickTimer = setTimeout(()=>{
+      if(accepting){ accepting=false; feedPush('&gt; CZAS NA KLIKNIĘCIE UPŁYNĄŁ', 'bad'); failRound(); }
+    }, w);
+  }
+  function failRound(){
+    clearClickTimer();
+    const fail = loseAttempt();
+    if(!fail){
+      round = Math.max(0, round-1);
+      sequence = sequence.slice(0, Math.max(3, sequence.length-1));
+      if(sequence.length<3){ sequence=[rand(0,NTILES-1),rand(0,NTILES-1),rand(0,NTILES-1)]; }
+      updateRound();
+      setTimeout(playSequence, 900);
+    }
+  }
+
+  tiles.forEach((t,idx)=>{
+    t.addEventListener('click', ()=>{
+      if(!accepting) return;
+      if(idx===mirrored[playerPos]){
+        t.classList.add('lit'); setTimeout(()=> t.classList.remove('lit'), 140);
+        playerPos++;
+        if(playerPos===mirrored.length){
+          accepting=false; clearClickTimer();
+          round++; updateRound();
+          feedPush('&gt; SEKWENCJA LUSTRZANA POPRAWNA ('+round+'/'+TARGET+')', 'like');
+          if(round>=TARGET){ feedPush('&gt; RDZEŃ PAMIĘCI ZSYNCHRONIZOWANY W PEŁNI', 'good'); setTimeout(()=> onModuleWin('MIR-OK'), 600); return; }
+          sequence.push(rand(0,NTILES-1));
+          setTimeout(playSequence, 700);
+        } else {
+          armClickTimer();
+        }
+      } else {
+        accepting=false;
+        t.classList.add('wrong'); setTimeout(()=> t.classList.remove('wrong'), 220);
+        feedPush('&gt; BŁĘDNY KAFEL — SEKWENCJA PRZERWANA', 'bad');
+        failRound();
+      }
+    });
+  });
+
+  sequence=[rand(0,NTILES-1),rand(0,NTILES-1),rand(0,NTILES-1)]; round=0; updateRound();
+  setTimeout(playSequence, 900);
+}
+
+/* ============================================================
+   MODUŁ 4 — SIMON SAYS (reakcja + pamięć wzrokowa)
+   4 kolorowe przyciski, powtarzaj sekwencję, 8 rund, 5 prób
+============================================================ */
+function startSimonSays(area, footer){
+  setupAttempts(5);
+  document.getElementById('hackTitle').textContent = '◤ PROTOKÓŁ SEKWENCJI — SIMON ◢';
+  footer.textContent = 'Powtarzaj sekwencję świateł w dokładnej kolejności. Każda runda dodaje kolejny krok. 8 rund = sukces.';
+
+  const wrap = document.createElement('div'); wrap.className='simonwrap';
+  wrap.innerHTML = `
+    <div class="simonstatus" id="simonStatus">RUNDA: 0 / 8</div>
+    <div class="simongrid">
+      <div class="simonbtn sb0" data-idx="0"></div>
+      <div class="simonbtn sb1" data-idx="1"></div>
+      <div class="simonbtn sb2" data-idx="2"></div>
+      <div class="simonbtn sb3" data-idx="3"></div>
+    </div>
+  `;
+  const feedCol = makeFeedCol();
+  area.appendChild(wrap); area.appendChild(feedCol);
+  feedEl = feedCol.querySelector('#feedlog');
+  feedPush('&gt; PROTOKÓŁ SEKWENCJI AKTYWNY', 'sys');
+  feedPush('&gt; 8 RUND, ROSNĄCA SEKWENCJA', 'bad');
+
+  const btns = wrap.querySelectorAll('.simonbtn');
+  const statusEl = wrap.querySelector('#simonStatus');
+  let sequence=[], playerSeq=[], round=0, playing=false, accepting=false;
+  const TARGET=8;
+
+  function updateStatus(){ statusEl.textContent='RUNDA: '+round+' / '+TARGET; }
+  async function playSeq(){
+    accepting=false; playing=true;
+    for(const idx of sequence){
+      await flashBtn(idx);
+    }
+    playing=false; accepting=true; playerSeq=[];
+    feedPush('&gt; TWOJA KOLEJ', 'like');
+  }
+  function flashBtn(idx){
+    return new Promise(res=>{
+      btns[idx].classList.add('flash');
+      setTimeout(()=>{ btns[idx].classList.remove('flash'); setTimeout(res,200); }, 400);
+    });
+  }
+  function nextRound(){
+    round++; updateStatus();
+    sequence.push(rand(0,3));
+    feedPush('&gt; RUNDA '+round+': długość sekwencji = '+sequence.length, 'sys');
+    setTimeout(playSeq, 700);
+  }
+
+  btns.forEach((btn,idx)=>{
+    btn.addEventListener('click', ()=>{
+      if(!accepting || playing) return;
+      flashBtn(idx);
+      playerSeq.push(idx);
+      if(playerSeq[playerSeq.length-1] !== sequence[playerSeq.length-1]){
+        accepting=false;
+        feedPush('&gt; BŁĄD — ZŁA SEKWENCJA', 'bad');
+        loseAttempt();
+        setTimeout(playSeq, 800);
+        return;
+      }
+      if(playerSeq.length === sequence.length){
+        accepting=false;
+        feedPush('&gt; SEKWENCJA POPRAWNA ('+round+'/'+TARGET+')', 'like');
+        if(round>=TARGET){
+          feedPush('&gt; PROTOKÓŁ SEKWENCJI ZSYNCHRONIZOWANY', 'good');
+          setTimeout(()=> onModuleWin('SIMON-OK'), 700);
+        } else {
+          nextRound();
+        }
+      }
+    });
+  });
+
+  nextRound();
+}
+
+/* ============================================================
+   MODUŁ 5 — WIRE DEFUSE (logika + dedukcja)
+   6 przewodów różnych kolorów, zasady jak w Keep Talking
+============================================================ */
+function startWireDefuse(area, footer){
+  setupAttempts(3);
+  document.getElementById('hackTitle').textContent = '◤ DETONATOR — ROZBRAJANIE ◢';
+  footer.textContent = 'Przetnij przewody według zasad. Jedna zasada pasuje do konfiguracji. Masz 3 próby.';
+
+  const colors = ['red','blue','green','yellow','white','red'];
+  shuffle(colors);
+  const wires = colors.slice(0,6);
+
+  const wrap = document.createElement('div'); wrap.className='wirewrap';
+  const status = document.createElement('div'); status.className='wirestatus'; status.textContent='WYBIERZ PRZEWODY DO PRZECIĘCIA';
+  const list = document.createElement('div'); list.className='wirelist';
+  wires.forEach((c,i)=>{
+    const item = document.createElement('div'); item.className='wireitem'; item.dataset.idx=i; item.dataset.color=c;
+    item.innerHTML = '<div class="wirebox wc-'+c+'"></div><div class="wirelabel">PRZEWÓD '+(i+1)+' ('+c.toUpperCase()+')</div>';
+    list.appendChild(item);
+  });
+
+  const ruleDiv = document.createElement('div'); ruleDiv.className='wirerule';
+  const redCount = wires.filter(w=>w==='red').length;
+  const blueCount = wires.filter(w=>w==='blue').length;
+  let rule='';
+  if(redCount===0){ rule='Brak czerwonych: przetnij 2. niebieski od końca.'; }
+  else if(redCount===1){ rule='Jeden czerwony: przetnij ostatni żółty lub biały.'; }
+  else if(redCount>=2){ rule='Dwa+ czerwone: przetnij ostatni czerwony.'; }
+  ruleDiv.textContent='ZASADA: '+rule;
+
+  wrap.appendChild(status); wrap.appendChild(list); wrap.appendChild(ruleDiv);
+  const feedCol = makeFeedCol();
+  area.appendChild(wrap); area.appendChild(feedCol);
+  feedEl = feedCol.querySelector('#feedlog');
+  feedPush('&gt; DETONATOR AKTYWNY', 'sys');
+  feedPush('&gt; 3 PRÓBY DOSTĘPNE', 'bad');
+
+  let solution=[];
+  if(redCount===0){
+    const blues = wires.map((c,i)=>c==='blue'?i:-1).filter(x=>x>=0);
+    if(blues.length>=2) solution=[blues[blues.length-2]];
+    else if(blues.length===1) solution=[blues[0]];
+    else solution=[0]; // fallback: przetnij pierwszy przewód
+  } else if(redCount===1){
+    const yw = wires.map((c,i)=>(c==='yellow'||c==='white')?i:-1).filter(x=>x>=0);
+    if(yw.length>0) solution=[yw[yw.length-1]];
+    else solution=[wires.length-1]; // fallback: przetnij ostatni przewód
+  } else {
+    const reds = wires.map((c,i)=>c==='red'?i:-1).filter(x=>x>=0);
+    if(reds.length>0) solution=[reds[reds.length-1]];
+    else solution=[wires.length-1]; // fallback: przetnij ostatni przewód
+  }
+
+  let cutWires=[];
+  let locked = false;
+  list.querySelectorAll('.wireitem').forEach(item=>{
+    item.addEventListener('click', ()=>{
+      if(locked) return;
+      const idx = parseInt(item.dataset.idx);
+      if(cutWires.includes(idx)) return;
+      cutWires.push(idx);
+      item.classList.add('cut');
+      feedPush('&gt; PRZECIĘTO PRZEWÓD '+(idx+1), 'sys');
+      if(solution.includes(idx)){
+        locked = true;
+        feedPush('&gt; DETONATOR ROZBROJONY', 'good');
+        setTimeout(()=> onModuleWin('WIRE-OK'), 700);
+      } else {
+        locked = true;
+        feedPush('&gt; ZŁY PRZEWÓD — DETONACJA', 'bad');
+        const failed = loseAttempt();
+        if(!failed){
+          setTimeout(()=>{
+            locked = false;
+            feedPush('&gt; SYSTEM RESETUJE — SPRÓBUJ PONOWNIE', 'sys');
+          }, 1000);
+        }
+      }
+    });
+  });
+}
+
+/* ============================================================
+   MODUŁ 6 — MEMORY PAIRS (pamięć + szybkość)
+   16 kart (8 par), odkryj wszystkie pary, 12 prób
+============================================================ */
+function startMemoryPairs(area, footer){
+  setupAttempts(12);
+  document.getElementById('hackTitle').textContent = '◤ MATRYCA PAMIĘCI — PARY ◢';
+  footer.textContent = 'Odkryj wszystkie 8 par symboli. Możesz odkryć dwie karty na raz. 12 prób.';
+
+  const symbols = ['α','β','γ','δ','ε','ζ','η','θ'];
+  const deck = shuffle([...symbols,...symbols]);
+
+  const wrap = document.createElement('div'); wrap.className='memorywrap';
+  const status = document.createElement('div'); status.className='memorystatus'; status.textContent='PARY: 0 / 8';
+  const grid = document.createElement('div'); grid.className='memorygrid';
+  deck.forEach((sym,i)=>{
+    const card = document.createElement('div'); card.className='memorycard'; card.dataset.idx=i; card.dataset.sym=sym; card.textContent='?';
+    grid.appendChild(card);
+  });
+  wrap.appendChild(status); wrap.appendChild(grid);
+  const feedCol = makeFeedCol();
+  area.appendChild(wrap); area.appendChild(feedCol);
+  feedEl = feedCol.querySelector('#feedlog');
+  feedPush('&gt; MATRYCA PAMIĘCI ZAŁADOWANA', 'sys');
+  feedPush('&gt; 8 PAR DO ODKRYCIA', 'bad');
+
+  let flipped=[], pairs=0, locked=false;
+  const cards = grid.querySelectorAll('.memorycard');
+
+  function updateStatus(){ status.textContent='PARY: '+pairs+' / 8'; }
+  cards.forEach(card=>{
+    card.addEventListener('click', ()=>{
+      if(locked || card.classList.contains('flipped') || card.classList.contains('matched')) return;
+      card.classList.add('flipped');
+      card.textContent = card.dataset.sym;
+      flipped.push(card);
+      if(flipped.length===2){
+        locked=true;
+        const [c1,c2]=flipped;
+        if(c1.dataset.sym === c2.dataset.sym){
+          setTimeout(()=>{
+            c1.classList.add('matched'); c2.classList.add('matched');
+            c1.classList.remove('flipped'); c2.classList.remove('flipped');
+            pairs++; updateStatus();
+            feedPush('&gt; PARA ZNALEZIONA: '+c1.dataset.sym, 'like');
+            if(pairs>=8){
+              feedPush('&gt; MATRYCA ZSYNCHRONIZOWANA', 'good');
+              setTimeout(()=> onModuleWin('MEM-OK'), 700);
+            }
+            flipped=[]; locked=false;
+          }, 500);
+        } else {
+          setTimeout(()=>{
+            c1.classList.remove('flipped'); c2.classList.remove('flipped');
+            c1.textContent='?'; c2.textContent='?';
+            feedPush('&gt; NIEPASUJĄCA PARA', 'bad');
+            loseAttempt();
+            flipped=[]; locked=false;
+          }, 800);
+        }
+      }
+    });
+  });
+}
+</script>
+</body>
+</html>
